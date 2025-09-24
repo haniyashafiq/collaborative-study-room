@@ -3,9 +3,7 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import List, Optional
 
-# -----------------------------
 # AUTH / USER
-# -----------------------------
 class UserBase(BaseModel):
     username: str
     email: EmailStr
@@ -30,9 +28,7 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 
-# -----------------------------
 # ROOMS
-# -----------------------------
 class RoomBase(BaseModel):
     name: str
 
@@ -47,9 +43,7 @@ class RoomResponse(RoomBase):
         orm_mode = True
 
 
-# -----------------------------
 # PARTICIPANTS
-# -----------------------------
 class ParticipantBase(BaseModel):
     username: str
 
@@ -64,9 +58,7 @@ class ParticipantResponse(ParticipantBase):
         orm_mode = True
 
 
-# -----------------------------
 # MESSAGES
-# -----------------------------
 class MessageBase(BaseModel):
     content: str
 
@@ -84,9 +76,7 @@ class MessageResponse(MessageBase):
         orm_mode = True
 
 
-# -----------------------------
 # TIMERS (Pomodoro)
-# -----------------------------
 class TimerBase(BaseModel):
     duration_minutes: int
 
