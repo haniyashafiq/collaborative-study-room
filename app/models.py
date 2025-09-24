@@ -1,4 +1,7 @@
 # models.py
+
+#Had to generate models in order to test the setup
+
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Boolean, func
 from sqlalchemy.orm import relationship
 from .database import Base
