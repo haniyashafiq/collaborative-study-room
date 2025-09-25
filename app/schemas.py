@@ -16,7 +16,13 @@ class UserResponse(UserBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+class UserOut(UserBase):
+    id: int
+
+    class Config:
+        from_attributes = True
 
 
 # JWT response
@@ -40,7 +46,7 @@ class RoomResponse(RoomBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # PARTICIPANTS
@@ -55,7 +61,7 @@ class ParticipantResponse(ParticipantBase):
     room_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # MESSAGES
@@ -73,7 +79,7 @@ class MessageResponse(MessageBase):
     room_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # TIMERS (Pomodoro)
@@ -90,4 +96,4 @@ class TimerResponse(TimerBase):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
