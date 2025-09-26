@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from app import models, schemas
 from app.database import get_db
 from app.auth_utils import create_access_token, verify_access_token, verify_password, hash_password
@@ -9,6 +10,27 @@ from app.auth_utils import create_access_token, verify_access_token, verify_pass
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
+# Dependency to get current logged-in user
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    payload = verify_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    username: str = payload.get("sub")
+    result = await db.execute(
+        select(models.User).options(joinedload(models.User)).filter(models.User.username == username)
+    )
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 @router.post("/register", response_model=schemas.UserOut)
 async def register_user(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
@@ -59,13 +81,11 @@ async def login(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/me")
-async def read_users_me(token: str = Depends(oauth2_scheme)):
-    payload = verify_access_token(token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return {"username": payload.get("sub")}
+@router.get("/me", response_model=schemas.UserOut)
+async def read_users_me(current_user: models.User = Depends(get_current_user)):
+    return current_user
+
+# 🔹 Logout route (client should simply discard token)
+@router.post("/logout")
+async def logout(current_user: models.User = Depends(get_current_user)):
+    return {"message": f"User '{current_user.username}' logged out successfully. Please discard your token."}
