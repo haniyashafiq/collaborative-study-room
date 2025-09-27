@@ -111,73 +111,160 @@ async def remove_user_from_room(db: AsyncSession, room_id: int, user_id: int) ->
     return True
 
 
-async def get_room_participants(db: AsyncSession, room_id: int) -> List[models.User]:
+async def get_room_participants(db: AsyncSession, room_id: int) -> List[schemas.ParticipantResponse]:
     result = await db.execute(
-        select(models.User)
-        .join(models.Participant, models.Participant.user_id == models.User.id)
+        select(models.Participant, models.User.username)
+        .join(models.User, models.Participant.user_id == models.User.id)
         .where(models.Participant.room_id == room_id)
     )
-    return result.scalars().all()
+    rows = result.all()
+    participants = []
+    for participant, username in rows:
+        participants.append(
+            schemas.ParticipantResponse(
+                id=participant.id,
+                room_id=participant.room_id,
+                username=username
+            )
+        )
+    return participants
 
+async def get_participant_by_username_and_room(db: AsyncSession, username: str, room_id: int):
+    result = await db.execute(
+        select(models.Participant, models.User.username)
+        .join(models.User, models.User.id == models.Participant.user_id)
+        .where(models.Participant.room_id == room_id, models.User.username == username)
+    )
+    row = result.first()
+    if not row:
+        return None
+    participant, username = row
+    return schemas.ParticipantResponse(
+        id=participant.id,
+        username=username,
+        room_id=participant.room_id
+    )
+
+async def create_participant(db: AsyncSession, participant: schemas.ParticipantCreate):
+    # resolve user_id by username
+    user = await get_user_by_username(db, participant.username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_participant = models.Participant(user_id=user.id, room_id=participant.room_id)
+    db.add(new_participant)
+    await db.commit()
+    await db.refresh(new_participant)
+    return schemas.ParticipantResponse(
+        id=new_participant.id,
+        username=user.username,
+        room_id=new_participant.room_id
+    )
+
+async def get_participants_by_room(db: AsyncSession, room_id: int):
+    result = await db.execute(
+        select(models.Participant, models.User.username)
+        .join(models.User, models.User.id == models.Participant.user_id)
+        .where(models.Participant.room_id == room_id)
+    )
+    rows = result.all()
+    return [
+        schemas.ParticipantResponse(
+            id=participant.id,
+            username=username,
+            room_id=participant.room_id
+        )
+        for participant, username in rows
+    ]
+
+async def get_participants_by_room(db: AsyncSession, room_id: int):
+    result = await db.execute(
+        select(models.Participant, models.User.username)
+        .join(models.User, models.User.id == models.Participant.user_id)
+        .where(models.Participant.room_id == room_id)
+    )
+    rows = result.all()
+    return [
+        schemas.ParticipantResponse(
+            id=participant.id,
+            username=username,
+            room_id=participant.room_id
+        )
+        for participant, username in rows
+    ]
+
+async def delete_participant(db: AsyncSession, participant_id: int):
+    result = await db.execute(select(models.Participant).where(models.Participant.id == participant_id))
+    participant = result.scalar_one_or_none()
+    if not participant:
+        return False
+    await db.delete(participant)
+    await db.commit()
+    return True
 
 # -----------------------------
 # MESSAGES
 # -----------------------------
-async def create_message(db: AsyncSession, msg: schemas.MessageCreate) -> models.Message:
-    """
-    Create a message from a MessageCreate (which contains sender: str and room_id: int).
-    Resolves sender (username) -> user_id. Raises 404 if user or room missing.
-    """
-    # ensure room exists
-    room = await get_room(db, msg.room_id)
-    if not room:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
-
-    # resolve user by username
-    user = await get_user_by_username(db, msg.sender)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    new_message = models.Message(
-        content=msg.content,
-        user_id=user.id,
-        room_id=msg.room_id,
+async def create_message(db: AsyncSession, message: schemas.MessageCreate, sender_id: int):
+    db_message = models.Message(
+        content=message.content,
+        user_id=sender_id,
+        room_id=message.room_id,
     )
-    db.add(new_message)
+    db.add(db_message)
     await db.commit()
-    await db.refresh(new_message)
-    return new_message
-
-
-# Backwards-compatible alias if any code calls save_message
-async def save_message(db: AsyncSession, msg: schemas.MessageCreate) -> models.Message:
-    return await create_message(db, msg)
-
-
-async def get_messages(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Message]:
-    result = await db.execute(
-        select(models.Message)
-        .order_by(models.Message.timestamp.desc())
-        .offset(skip)
-        .limit(limit)
+    await db.refresh(db_message)
+    return schemas.MessageResponse(
+        id=db_message.id,
+        content=db_message.content,
+        timestamp=db_message.timestamp,
+        sender=db_message.user.username,  # ✅ ensure username is returned
+        room_id=db_message.room_id
     )
-    # return ascending order (oldest first)
-    return list(reversed(result.scalars().all()))
 
 
-async def get_messages_by_room(db: AsyncSession, room_id: int, limit: int = 50) -> List[models.Message]:
-    # ensure room exists
-    room = await get_room(db, room_id)
-    if not room:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+# ---------------------------
+# Get all messages
+# ---------------------------
+async def get_messages(db: AsyncSession):
+    result = await db.execute(
+        select(models.Message).order_by(models.Message.timestamp)
+    )
+    messages = result.scalars().all()
+    return [
+        schemas.MessageResponse(
+            id=m.id,
+            content=m.content,
+            timestamp=m.timestamp,
+            sender=m.user.username,  # ✅ join with User
+            room_id=m.room_id
+        )
+        for m in messages
+    ]
 
+
+# ---------------------------
+# Get messages by room
+# ---------------------------
+async def get_messages_by_room(db: AsyncSession, room_id: int):
     result = await db.execute(
         select(models.Message)
         .where(models.Message.room_id == room_id)
-        .order_by(models.Message.timestamp.desc())
-        .limit(limit)
+        .order_by(models.Message.timestamp)
     )
-    return list(reversed(result.scalars().all()))
+    messages = result.scalars().all()
+    return [
+        schemas.MessageResponse(
+            id=m.id,
+            content=m.content,
+            timestamp=m.timestamp,
+            sender=m.user.username,  # ✅ show username not id
+            room_id=m.room_id
+        )
+        for m in messages
+    ]
+
+
 
 
 # ---------------------------
