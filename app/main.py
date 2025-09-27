@@ -4,7 +4,7 @@
 import uvicorn
 from fastapi import FastAPI
 from app.database import Base, engine
-from app.routers import rooms, messages, participants, timer
+from app.routers import rooms, messages, participants, timer, auth
 
 # Create all database tables
 # (in production you'd use Alembic migrations instead)
@@ -26,6 +26,7 @@ app.include_router(rooms.router)
 app.include_router(messages.router)
 app.include_router(participants.router)
 app.include_router(timer.router)
+app.include_router(auth.router)
 
 
 # Root endpoint
