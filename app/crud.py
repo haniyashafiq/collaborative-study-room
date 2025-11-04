@@ -73,6 +73,9 @@ async def get_room(db: AsyncSession, room_id: int) -> Optional[models.Room]:
     )
     return result.scalar_one_or_none()
 
+async def get_room_by_name(db: AsyncSession, name: str):
+    result = await db.execute(select(models.Room).filter(models.Room.name == name))
+    return result.scalars().first()
 
 # -----------------------------
 # PARTICIPANTS

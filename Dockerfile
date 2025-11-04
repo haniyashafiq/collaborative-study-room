@@ -1,5 +1,5 @@
 # Use official Python image
-FROM python:3.11-slim
+FROM python:3.12-slim-bookworm
 
 # Set working directory
 WORKDIR /app
@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install dependencies
+ENV PIP_DEFAULT_TIMEOUT=200
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the app

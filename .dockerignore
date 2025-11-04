@@ -1,0 +1,30 @@
+# Ignore Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore virtual environment
+venv/
+
+# Ignore Git
+.git/
+.gitignore
+
+# Ignore environment files and secrets
+.env
+.env.*
+
+# Ignore local config / IDE files
+*.log
+*.sqlite3
+*.db
+*.pid
+*.swp
+*.swo
+.DS_Store
+.vscode/
+.idea/
+
+# Ignore local Docker data
+postgres_data/
