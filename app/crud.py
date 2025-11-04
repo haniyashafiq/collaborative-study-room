@@ -60,7 +60,7 @@ async def create_room(db: AsyncSession, room: schemas.RoomCreate) -> models.Room
     return new_room
 
 
-async def list_rooms(db: AsyncSession) -> List[models.Room]:
+async def get_rooms(db: AsyncSession, skip: int = 0, limit: int = 10) -> List[models.Room]:
     result = await db.execute(select(models.Room))
     return result.scalars().all()
 
