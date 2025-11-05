@@ -71,7 +71,7 @@ async def get_room(db: AsyncSession, room_id: int) -> Optional[models.Room]:
         .options(joinedload(models.Room.participants).joinedload(models.Participant.user))
         .where(models.Room.id == room_id)
     )
-    return result.scalar_one_or_none()
+    return result.unique().scalar_one_or_none()
 
 async def get_room_by_name(db: AsyncSession, name: str):
     result = await db.execute(select(models.Room).filter(models.Room.name == name))

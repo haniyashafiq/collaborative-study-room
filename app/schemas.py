@@ -34,21 +34,6 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 
-# ROOMS
-class RoomBase(BaseModel):
-    name: str
-
-class RoomCreate(RoomBase):
-    pass
-
-class RoomResponse(RoomBase):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 # PARTICIPANTS
 class ParticipantBase(BaseModel):
     username: str
@@ -59,7 +44,21 @@ class ParticipantCreate(ParticipantBase):
 class ParticipantResponse(ParticipantBase):
     id: int
     room_id: int
+    user: UserResponse
+    class Config:
+        from_attributes = True
 
+# ROOMS
+class RoomBase(BaseModel):
+    name: str
+
+class RoomCreate(RoomBase):
+    pass
+
+class RoomResponse(RoomBase):
+    id: int
+    created_at: datetime
+    participants: List[ParticipantResponse] = []
     class Config:
         from_attributes = True
 
