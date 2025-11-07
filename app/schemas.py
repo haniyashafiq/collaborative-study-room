@@ -36,29 +36,29 @@ class TokenData(BaseModel):
 
 # PARTICIPANTS
 class ParticipantBase(BaseModel):
-    username: str
+    pass
 
 class ParticipantCreate(ParticipantBase):
     room_id: int
-
+    username: Optional[str] = None  # Optional for self-join or admin add
+    
 class ParticipantResponse(ParticipantBase):
     id: int
     room_id: int
     user: UserResponse
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+class ParticipantCreate(BaseModel):
+    room_id: int
+    username: Optional[str] = None  # Optional for self-join or admin add
+
 
 #Rooms
 class RoomCreate(BaseModel):
     name: str
 
-class ParticipantResponse(BaseModel):
-    id: int
-    user_id: int
-    room_id: int
 
-    class Config:
-        from_attributes = True
 
 class RoomBase(BaseModel):
     id: int

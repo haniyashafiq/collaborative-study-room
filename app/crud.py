@@ -184,21 +184,43 @@ async def get_participant_by_username_and_room(db: AsyncSession, username: str, 
         room_id=participant.room_id
     )
 
-async def create_participant(db: AsyncSession, participant: schemas.ParticipantCreate):
-    # resolve user_id by username
-    user = await get_user_by_username(db, participant.username)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+# async def create_participant(db: AsyncSession, participant: schemas.ParticipantCreate):
+#     # resolve user_id by username
+#     user = await get_user_by_username(db, participant.username)
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found")
 
-    new_participant = models.Participant(user_id=user.id, room_id=participant.room_id)
-    db.add(new_participant)
-    await db.commit()
-    await db.refresh(new_participant)
-    return schemas.ParticipantResponse(
-        id=new_participant.id,
-        username=user.username,
-        room_id=new_participant.room_id
+#     new_participant = models.Participant(user_id=user.id, room_id=participant.room_id)
+#     db.add(new_participant)
+#     await db.commit()
+#     await db.refresh(new_participant)
+#     return schemas.ParticipantResponse(
+#         id=new_participant.id,
+#         username=user.username,
+#         room_id=new_participant.room_id
+#     )
+
+async def create_participant(db: AsyncSession, room_id: int, user_id: int):
+    # Check if participant already exists
+    result = await db.execute(
+        select(models.Participant).where(
+            models.Participant.room_id == room_id,
+            models.Participant.user_id == user_id
+        )
     )
+    existing = result.scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="User already in room")
+
+    participant = models.Participant(room_id=room_id, user_id=user_id)
+    db.add(participant)
+    await db.commit()
+
+    # 🔹 NEW: ensure user relationship is loaded for proper serialization
+    await db.refresh(participant, attribute_names=["user"])
+    return participant
+
+
 
 async def get_participants_by_room(db: AsyncSession, room_id: int):
     result = await db.execute(
@@ -240,6 +262,11 @@ async def delete_participant(db: AsyncSession, participant_id: int):
     await db.delete(participant)
     await db.commit()
     return True
+
+async def get_participant(db: AsyncSession, participant_id: int):
+    result = await db.execute(select(models.Participant).where(models.Participant.id == participant_id))
+    return result.scalar_one_or_none()
+
 
 # -----------------------------
 # MESSAGES
