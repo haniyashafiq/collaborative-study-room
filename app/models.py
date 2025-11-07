@@ -17,9 +17,11 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    role = Column(String, default="user")  # 👈 Added column (default is "user")
 
-    messages = relationship("Message", back_populates="user")
-    participants = relationship("Participant", back_populates="user")
+    rooms = relationship("Room", back_populates="creator")
+    messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")
+    participants = relationship("Participant", back_populates="user", cascade="all, delete-orphan")
 
 
 # -----------------------------
@@ -27,14 +29,18 @@ class User(Base):
 # -----------------------------
 class Room(Base):
     __tablename__ = "rooms"
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    creator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    # Relationships
+    creator = relationship("User", back_populates="rooms")
     participants = relationship("Participant", back_populates="room", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="room", cascade="all, delete-orphan")
     timers = relationship("Timer", back_populates="room", cascade="all, delete-orphan")
-
 
 # -----------------------------
 # PARTICIPANTS

@@ -10,6 +10,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from . import models, schemas
 from .utils import hash_password
@@ -52,17 +54,35 @@ async def get_user_by_username(db: AsyncSession, username: str) -> Optional[mode
 # -----------------------------
 # ROOMS
 # -----------------------------
-async def create_room(db: AsyncSession, room: schemas.RoomCreate) -> models.Room:
-    new_room = models.Room(name=room.name)
+async def create_room(db: AsyncSession, room: schemas.RoomCreate, user_id: int) -> models.Room:
+    new_room = models.Room(name=room.name, creator_id=user_id)
     db.add(new_room)
     await db.commit()
+
+    # Refresh with relationships loaded
     await db.refresh(new_room)
-    return new_room
+
+    # Explicitly re-fetch the room with eager-loaded relationships
+    result = await db.execute(
+        select(models.Room)
+        .options(selectinload(models.Room.participants))
+        .where(models.Room.id == new_room.id)
+    )
+    return result.scalar_one()
 
 
 async def get_rooms(db: AsyncSession, skip: int = 0, limit: int = 10) -> List[models.Room]:
-    result = await db.execute(select(models.Room))
-    return result.scalars().all()
+    result = await db.execute(
+        select(models.Room)
+        .options(
+            selectinload(models.Room.participants).selectinload(models.Participant.user),
+            selectinload(models.Room.creator)
+        )
+        .offset(skip)
+        .limit(limit)
+    )
+    # .unique() is useful when joins might duplicate parent rows; safe to keep
+    return result.scalars().unique().all()
 
 
 async def get_room(db: AsyncSession, room_id: int) -> Optional[models.Room]:
@@ -76,6 +96,22 @@ async def get_room(db: AsyncSession, room_id: int) -> Optional[models.Room]:
 async def get_room_by_name(db: AsyncSession, name: str):
     result = await db.execute(select(models.Room).filter(models.Room.name == name))
     return result.scalars().first()
+
+
+async def delete_room(db: AsyncSession, room_id: int, current_user: models.User) -> bool:
+    result = await db.execute(select(models.Room).where(models.Room.id == room_id))
+    room = result.scalars().first()
+
+    if not room:
+        raise ValueError("Room not found")
+
+    # Authorization check
+    if room.creator_id != current_user.id and current_user.role != "admin":
+        raise PermissionError("You are not authorized to delete this room")
+
+    await db.delete(room)
+    await db.commit()
+    return True
 
 # -----------------------------
 # PARTICIPANTS

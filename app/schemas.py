@@ -16,13 +16,13 @@ class UserResponse(UserBase):
     created_at: datetime
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 class UserOut(UserBase):
     id: int
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 # JWT response
@@ -46,22 +46,31 @@ class ParticipantResponse(ParticipantBase):
     room_id: int
     user: UserResponse
     class Config:
-        from_attributes = True
+        orm_mode = True
 
-# ROOMS
-class RoomBase(BaseModel):
+#Rooms
+class RoomCreate(BaseModel):
     name: str
 
-class RoomCreate(RoomBase):
-    pass
-
-class RoomResponse(RoomBase):
+class ParticipantResponse(BaseModel):
     id: int
-    created_at: datetime
-    participants: List[ParticipantResponse] = []
+    user_id: int
+    room_id: int
+
     class Config:
         from_attributes = True
 
+class RoomBase(BaseModel):
+    id: int
+    name: str
+    creator_id: Optional[int] = None  # can be null if user deleted
+
+    class Config:
+        from_attributes = True
+
+
+class RoomResponse(RoomBase):
+    participants: List[ParticipantResponse] = []
 
 # MESSAGES
 class MessageBase(BaseModel):
@@ -78,7 +87,7 @@ class MessageResponse(MessageBase):
     room_id: int
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 # TIMERS (Pomodoro)
@@ -95,4 +104,4 @@ class TimerResponse(TimerBase):
     is_active: bool
 
     class Config:
-        from_attributes = True
+        orm_mode = True
