@@ -133,7 +133,6 @@ async def add_user_to_room(db: AsyncSession, room_id: int, user_id: int) -> bool
     await db.commit()
     return True
 
-
 async def remove_user_from_room(db: AsyncSession, room_id: int, user_id: int) -> bool:
     result = await db.execute(
         select(models.Participant).where(
@@ -148,25 +147,6 @@ async def remove_user_from_room(db: AsyncSession, room_id: int, user_id: int) ->
     await db.delete(participant)
     await db.commit()
     return True
-
-
-async def get_room_participants(db: AsyncSession, room_id: int) -> List[schemas.ParticipantResponse]:
-    result = await db.execute(
-        select(models.Participant, models.User.username)
-        .join(models.User, models.Participant.user_id == models.User.id)
-        .where(models.Participant.room_id == room_id)
-    )
-    rows = result.all()
-    participants = []
-    for participant, username in rows:
-        participants.append(
-            schemas.ParticipantResponse(
-                id=participant.id,
-                room_id=participant.room_id,
-                username=username
-            )
-        )
-    return participants
 
 async def get_participant_by_username_and_room(db: AsyncSession, username: str, room_id: int):
     result = await db.execute(
@@ -183,22 +163,6 @@ async def get_participant_by_username_and_room(db: AsyncSession, username: str, 
         username=username,
         room_id=participant.room_id
     )
-
-# async def create_participant(db: AsyncSession, participant: schemas.ParticipantCreate):
-#     # resolve user_id by username
-#     user = await get_user_by_username(db, participant.username)
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
-
-#     new_participant = models.Participant(user_id=user.id, room_id=participant.room_id)
-#     db.add(new_participant)
-#     await db.commit()
-#     await db.refresh(new_participant)
-#     return schemas.ParticipantResponse(
-#         id=new_participant.id,
-#         username=user.username,
-#         room_id=new_participant.room_id
-#     )
 
 async def create_participant(db: AsyncSession, room_id: int, user_id: int):
     # Check if participant already exists
@@ -221,38 +185,26 @@ async def create_participant(db: AsyncSession, room_id: int, user_id: int):
     return participant
 
 
-
 async def get_participants_by_room(db: AsyncSession, room_id: int):
     result = await db.execute(
-        select(models.Participant, models.User.username)
-        .join(models.User, models.User.id == models.Participant.user_id)
-        .where(models.Participant.room_id == room_id)
+    select(models.Participant, models.User)
+    .join(models.User, models.User.id == models.Participant.user_id)
+    .where(models.Participant.room_id == room_id)
     )
     rows = result.all()
     return [
-        schemas.ParticipantResponse(
-            id=participant.id,
-            username=username,
-            room_id=participant.room_id
+    schemas.ParticipantResponse(
+        id=participant.id,
+        room_id=participant.room_id,
+        user=schemas.UserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            created_at=user.created_at
         )
-        for participant, username in rows
-    ]
-
-async def get_participants_by_room(db: AsyncSession, room_id: int):
-    result = await db.execute(
-        select(models.Participant, models.User.username)
-        .join(models.User, models.User.id == models.Participant.user_id)
-        .where(models.Participant.room_id == room_id)
     )
-    rows = result.all()
-    return [
-        schemas.ParticipantResponse(
-            id=participant.id,
-            username=username,
-            room_id=participant.room_id
-        )
-        for participant, username in rows
-    ]
+    for participant, user in rows
+]
 
 async def delete_participant(db: AsyncSession, participant_id: int):
     result = await db.execute(select(models.Participant).where(models.Participant.id == participant_id))
@@ -263,10 +215,23 @@ async def delete_participant(db: AsyncSession, participant_id: int):
     await db.commit()
     return True
 
+async def delete_participant_by_room_and_user(db: AsyncSession, room_id: int, user_id: int) -> bool:
+    result = await db.execute(
+        select(models.Participant).where(
+            models.Participant.room_id == room_id,
+            models.Participant.user_id == user_id
+        )
+    )
+    participant = result.scalar_one_or_none()
+    if not participant:
+        return False
+    await db.delete(participant)
+    await db.commit()
+    return True
+
 async def get_participant(db: AsyncSession, participant_id: int):
     result = await db.execute(select(models.Participant).where(models.Participant.id == participant_id))
     return result.scalar_one_or_none()
-
 
 # -----------------------------
 # MESSAGES
@@ -288,7 +253,6 @@ async def create_message(db: AsyncSession, message: schemas.MessageCreate, sende
         room_id=db_message.room_id
     )
 
-
 # ---------------------------
 # Get all messages
 # ---------------------------
@@ -307,7 +271,6 @@ async def get_messages(db: AsyncSession):
         )
         for m in messages
     ]
-
 
 # ---------------------------
 # Get messages by room
@@ -329,9 +292,6 @@ async def get_messages_by_room(db: AsyncSession, room_id: int):
         )
         for m in messages
     ]
-
-
-
 
 # ---------------------------
 # TIMER CRUD

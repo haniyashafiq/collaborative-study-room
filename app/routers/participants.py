@@ -58,37 +58,6 @@ async def add_participant(
     return participant_obj
 
 
-# @router.post(
-#     "/",
-#     response_model=schemas.ParticipantResponse,
-#     status_code=status.HTTP_201_CREATED
-# )
-# async def add_participant(
-#     participant: schemas.ParticipantCreate,
-#     db: AsyncSession = Depends(get_db),
-#     current_user: models.User = Depends(get_current_user)
-# ):
-#     # Check if room exists
-#     db_room = await crud.get_room(db, participant.room_id)
-#     if not db_room:
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail="Room not found"
-#         )
-
-#     # Check if participant already in room
-#     existing = await crud.get_participant_by_username_and_room(
-#         db, username=participant.username, room_id=participant.room_id
-#     )
-#     if existing:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Participant already in this room"
-#         )
-
-#     return await crud.create_participant(db, participant)
-
-
 # ---------------------------
 # Get all participants in a room
 # ---------------------------
@@ -115,21 +84,24 @@ async def get_participants(
 # ---------------------------
 # Remove a participant from a room
 # ---------------------------
-@router.delete(
-    "/{participant_id}",
-    status_code=status.HTTP_200_OK
-)
-async def remove_participant(
-    participant_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    db_participant = await crud.get_participant(db, participant_id)
-    if not db_participant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Participant not found"
-        )
 
-    await crud.delete_participant(db, participant_id)
-    return {"detail": f"Participant {participant_id} removed successfully"}
+# Option A: delete by room + user (preferred)
+@router.delete("/rooms/{room_id}/users/{user_id}", status_code=status.HTTP_200_OK)
+async def remove_participant_from_room(
+    room_id: int,
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    room = await crud.get_room(db, room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # allow if self or room creator or admin
+    if user_id != current_user.id and room.creator_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to remove this participant")
+
+    success = await crud.delete_participant_by_room_and_user(db, room_id, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    return {"detail": f"User {user_id} removed from room {room_id}"}

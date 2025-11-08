@@ -49,9 +49,6 @@ class ParticipantResponse(ParticipantBase):
     class Config:
         from_attributes = True
 
-class ParticipantCreate(BaseModel):
-    room_id: int
-    username: Optional[str] = None  # Optional for self-join or admin add
 
 
 #Rooms
