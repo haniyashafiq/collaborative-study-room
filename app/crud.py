@@ -62,13 +62,21 @@ async def create_room(db: AsyncSession, room: schemas.RoomCreate, user_id: int) 
     # Refresh with relationships loaded
     await db.refresh(new_room)
 
-    # Explicitly re-fetch the room with eager-loaded relationships
+    # Automatically add the creator as a participant
+    creator_participant = models.Participant(room_id=new_room.id, user_id=user_id)
+    db.add(creator_participant)
+    await db.commit()  # commit separately so both are persisted
+    await db.refresh(creator_participant)
+
+    # 3️Re-fetch the room with participants relationship eagerly loaded
     result = await db.execute(
         select(models.Room)
         .options(selectinload(models.Room.participants))
         .where(models.Room.id == new_room.id)
     )
-    return result.scalar_one()
+    room_with_participants = result.scalar_one()
+
+    return room_with_participants
 
 
 async def get_rooms(db: AsyncSession, skip: int = 0, limit: int = 10) -> List[models.Room]:
