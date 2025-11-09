@@ -70,22 +70,39 @@ class RoomResponse(RoomBase):
     participants: List[ParticipantResponse] = []
 
 # MESSAGES
+# class MessageBase(BaseModel):
+#     content: str
+
+# class MessageCreate(MessageBase):
+#     sender: str
+#     room_id: int
+
+# class MessageResponse(MessageBase):
+#     id: int
+#     sender: str
+#     timestamp: datetime
+#     room_id: int
+
+#     class Config:
+#         orm_mode = True
+
 class MessageBase(BaseModel):
     content: str
 
+
 class MessageCreate(MessageBase):
-    sender: str
     room_id: int
 
-class MessageResponse(MessageBase):
+
+class MessageResponse(BaseModel):
     id: int
-    sender: str
+    content: str
     timestamp: datetime
+    user: dict
     room_id: int
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # TIMERS (Pomodoro)
 class TimerBase(BaseModel):

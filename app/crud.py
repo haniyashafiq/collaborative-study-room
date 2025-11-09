@@ -236,62 +236,41 @@ async def get_participant(db: AsyncSession, participant_id: int):
 # -----------------------------
 # MESSAGES
 # -----------------------------
-async def create_message(db: AsyncSession, message: schemas.MessageCreate, sender_id: int):
-    db_message = models.Message(
-        content=message.content,
-        user_id=sender_id,
-        room_id=message.room_id,
+# CREATE MESSAGE 
+async def create_message(db: AsyncSession, message_data: schemas.MessageCreate, user_id: int):
+    new_message = models.Message(
+        content=message_data.content,
+        room_id=message_data.room_id,
+        user_id=user_id
     )
-    db.add(db_message)
+    db.add(new_message)
     await db.commit()
-    await db.refresh(db_message)
-    return schemas.MessageResponse(
-        id=db_message.id,
-        content=db_message.content,
-        timestamp=db_message.timestamp,
-        sender=db_message.user.username,  # ✅ ensure username is returned
-        room_id=db_message.room_id
-    )
+    await db.refresh(new_message)
+    return new_message
 
-# ---------------------------
-# Get all messages
-# ---------------------------
-async def get_messages(db: AsyncSession):
-    result = await db.execute(
-        select(models.Message).order_by(models.Message.timestamp)
-    )
-    messages = result.scalars().all()
-    return [
-        schemas.MessageResponse(
-            id=m.id,
-            content=m.content,
-            timestamp=m.timestamp,
-            sender=m.user.username,  # ✅ join with User
-            room_id=m.room_id
-        )
-        for m in messages
-    ]
 
-# ---------------------------
-# Get messages by room
-# ---------------------------
-async def get_messages_by_room(db: AsyncSession, room_id: int):
+# GET MESSAGES BY ROOM 
+async def get_messages_by_room(db: AsyncSession, room_id: int, skip: int = 0, limit: int = 50):
     result = await db.execute(
         select(models.Message)
+        .options(joinedload(models.Message.user))
         .where(models.Message.room_id == room_id)
-        .order_by(models.Message.timestamp)
+        .order_by(models.Message.timestamp.asc())
+        .offset(skip)
+        .limit(limit)
     )
-    messages = result.scalars().all()
-    return [
-        schemas.MessageResponse(
-            id=m.id,
-            content=m.content,
-            timestamp=m.timestamp,
-            sender=m.user.username,  # ✅ show username not id
-            room_id=m.room_id
+    return result.scalars().all()
+
+#helper function to check if user is participant in room
+async def is_user_participant(db: AsyncSession, room_id: int, user_id: int) -> bool:
+    result = await db.execute(
+        select(models.Participant).where(
+            models.Participant.room_id == room_id,
+            models.Participant.user_id == user_id
         )
-        for m in messages
-    ]
+    )
+    return result.scalar_one_or_none() is not None
+
 
 # ---------------------------
 # TIMER CRUD
