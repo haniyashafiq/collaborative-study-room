@@ -1,7 +1,7 @@
 # schemas.py
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 # AUTH / USER
 class UserBase(BaseModel):
@@ -103,6 +103,23 @@ class MessageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+#Websockets
+class WSMessageIn(BaseModel):
+    type: Literal["message"] = "message"
+    content: str = Field(..., min_length=1, max_length=500)
+
+class WSMessageOut(BaseModel):
+    id: int
+    content: str
+    timestamp: datetime
+    room_id: int
+    user_id: int
+    username: str
+    type: Literal["message"] = "message"
+    model_config = ConfigDict(from_attributes=True)
+
 
 # TIMERS (Pomodoro)
 class TimerBase(BaseModel):

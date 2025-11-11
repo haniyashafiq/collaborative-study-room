@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy import desc
 
 from . import models, schemas
 from .utils import hash_password
@@ -158,19 +159,35 @@ async def remove_user_from_room(db: AsyncSession, room_id: int, user_id: int) ->
 
 async def get_participant_by_username_and_room(db: AsyncSession, username: str, room_id: int):
     result = await db.execute(
-        select(models.Participant, models.User.username)
-        .join(models.User, models.User.id == models.Participant.user_id)
-        .where(models.Participant.room_id == room_id, models.User.username == username)
+        select(models.Participant)
+        .join(models.User)
+        .where(models.Participant.room_id == room_id)
+        .where(models.User.username == username)
+        .options(selectinload(models.Participant.user))  # ensures participant.user is loaded
     )
-    row = result.first()
-    if not row:
+    participant = result.scalar_one_or_none()
+    if not participant:
         return None
-    participant, username = row
+
+    # Return ParticipantResponse with nested UserResponse
     return schemas.ParticipantResponse(
         id=participant.id,
-        username=username,
-        room_id=participant.room_id
+        room_id=participant.room_id,
+        user=schemas.UserResponse(
+            id=participant.user.id,
+            username=participant.user.username,
+            email=participant.user.email,
+            created_at=participant.user.created_at
+        )
     )
+
+async def get_participant_by_room_and_user(db: AsyncSession, room_id: int, user_id: int):
+    result = await db.execute(
+        select(models.Participant)
+        .where(models.Participant.room_id == room_id, models.Participant.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
 
 async def create_participant(db: AsyncSession, room_id: int, user_id: int):
     # Check if participant already exists
@@ -279,6 +296,24 @@ async def is_user_participant(db: AsyncSession, room_id: int, user_id: int) -> b
     )
     return result.scalar_one_or_none() is not None
 
+# ---------------------------
+#WEBSOCKET
+# ---------------------------
+async def create_message_for_websocket(db: AsyncSession, content: str, room_id: int, user_id: int):
+    message = models.Message(content=content, room_id=room_id, user_id=user_id)
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+    return message
+
+async def get_recent_messages(db: AsyncSession, room_id: int, limit: int = 50):
+    result = await db.execute(
+        select(models.Message)
+        .where(models.Message.room_id == room_id)
+        .order_by(desc(models.Message.timestamp))
+        .limit(limit)
+    )
+    return result.scalars().all()
 
 # ---------------------------
 # TIMER CRUD
