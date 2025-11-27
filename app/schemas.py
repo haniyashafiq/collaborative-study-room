@@ -1,7 +1,7 @@
 # schemas.py
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Any
 
 # AUTH / USER
 class UserBase(BaseModel):
@@ -107,8 +107,12 @@ class MessageResponse(BaseModel):
 
 #Websockets
 class WSMessageIn(BaseModel):
-    type: Literal["message"] = "message"
-    content: str = Field(..., min_length=1, max_length=500)
+    type: Literal["message", "timer"]  # allow two types safely
+
+    # content can now be:
+    # - string for chat
+    # - dict for timer commands
+    content: Optional[Any] = Field(...)
 
 class WSMessageOut(BaseModel):
     id: int
@@ -122,17 +126,15 @@ class WSMessageOut(BaseModel):
 
 
 # TIMERS (Pomodoro)
-class TimerBase(BaseModel):
-    duration_minutes: int
 
-class TimerCreate(TimerBase):
-    room_id: int
+class TimerStartRequest(BaseModel):
+    duration: int  # seconds
 
-class TimerResponse(TimerBase):
-    id: int
+class TimerResponse(BaseModel):
     room_id: int
-    started_at: datetime
-    is_active: bool
+    duration: int
+    remaining: int
+    is_running: bool
 
     class Config:
         orm_mode = True

@@ -319,41 +319,41 @@ async def get_recent_messages(db: AsyncSession, room_id: int, limit: int = 50):
 # TIMER CRUD
 # ---------------------------
 
-async def create_timer(db: AsyncSession, timer: schemas.TimerCreate):
-    db_timer = models.Timer(
-        room_id=timer.room_id,
-        duration_minutes=timer.duration_minutes,
-        is_active=True
-    )
-    db.add(db_timer)
-    await db.commit()
-    await db.refresh(db_timer)
-    return db_timer
-
-
-async def get_timer(db: AsyncSession, timer_id: int):
-    result = await db.execute(select(models.Timer).where(models.Timer.id == timer_id))
-    return result.scalars().first()
-
-
-async def get_timers_by_room(db: AsyncSession, room_id: int):
+async def get_timer_by_room(db: AsyncSession, room_id: int):
     result = await db.execute(select(models.Timer).where(models.Timer.room_id == room_id))
-    return result.scalars().all()
+    return result.scalar_one_or_none()
 
+async def create_or_update_timer(db: AsyncSession, room_id: int, duration: int, remaining: int, is_running: bool):
+    timer = await get_timer_by_room(db, room_id)
+    if not timer:
+        timer = models.Timer(room_id=room_id, duration=duration, remaining=remaining, is_running=is_running)
+        db.add(timer)
+        await db.commit()
+        await db.refresh(timer)
+        return timer
+    else:
+        stmt = (
+            update(models.Timer)
+            .where(models.Timer.room_id == room_id)
+            .values(duration=duration, remaining=remaining, is_running=is_running)
+            .returning(models.Timer)
+        )
+        result = await db.execute(stmt)
+        await db.commit()
+        return await get_timer_by_room(db, room_id)
 
-async def stop_timer(db: AsyncSession, timer_id: int):
-    db_timer = await get_timer(db, timer_id)
-    if not db_timer:
-        return None
-
+async def update_timer_state(db: AsyncSession, room_id: int, remaining: int, is_running: bool):
     stmt = (
         update(models.Timer)
-        .where(models.Timer.id == timer_id)
-        .values(is_active=False)
-        .execution_options(synchronize_session="fetch")
+        .where(models.Timer.room_id == room_id)
+        .values(remaining=remaining, is_running=is_running)
     )
     await db.execute(stmt)
     await db.commit()
+    return await get_timer_by_room(db, room_id)
 
-    await db.refresh(db_timer)
-    return db_timer
+async def delete_timer(db: AsyncSession, room_id: int):
+    timer = await get_timer_by_room(db, room_id)
+    if timer:
+        await db.delete(timer)
+        await db.commit()

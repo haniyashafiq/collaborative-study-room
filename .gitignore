@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Environments
+.env
+.env.*
+.venv/
+venv/
+env/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Build/dist
+dist/
+build/
+site/
+
+# Logs
+*.log
+logs/
+
+# Databases
+*.sqlite3
+*.sqlite
+*.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node (if any frontend assets appear later)
+node_modules/
+
+# Alembic
+alembic/versions/__pycache__/
+alembic/versions
+# Docker compose local overrides
+docker-compose.override.yml
+
+# Cache
+.cache/
+
+# Git internals (never commit)
+.git/
+
+.idea/
+postgres_data/
+postgres_data/

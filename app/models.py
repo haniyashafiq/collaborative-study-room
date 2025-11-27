@@ -74,13 +74,14 @@ class Message(Base):
 # -----------------------------
 # TIMERS (Pomodoro sessions)
 # -----------------------------
+
 class Timer(Base):
     __tablename__ = "timers"
+
     id = Column(Integer, primary_key=True, index=True)
-    started_at = Column(DateTime(timezone=True), server_default=func.now())
-    duration_minutes = Column(Integer, nullable=False)
-    is_active = Column(Boolean, default=True)
-
-    room_id = Column(Integer, ForeignKey("rooms.id"))
+    room_id = Column(Integer, ForeignKey("rooms.id"), unique=True, nullable=False)
     room = relationship("Room", back_populates="timers")
-
+    duration = Column(Integer, nullable=False)         # total seconds configured (e.g., 1500)
+    remaining = Column(Integer, nullable=False)        # remaining seconds
+    is_running = Column(Boolean, default=False, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
