@@ -8,11 +8,11 @@ services:
       POSTGRES_PASSWORD: studypass
       POSTGRES_DB: studyroom
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U studyuser -d studyroom"]
+      test: ['CMD-SHELL', 'pg_isready -U studyuser -d studyroom']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -32,11 +32,29 @@ services:
       ALGORITHM: ${ALGORITHM}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
     ports:
-      - "5000:5000"
+      - '5000:5000'
     volumes:
       # Mount your local app directory into /app inside the container
       - .:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
+
+  frontend:
+    build:
+      context: ../collaborative-study-room-frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: always
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+    volumes:
+      # Live mount for hot reload - changes reflect immediately
+      - ../collaborative-study-room-frontend:/app
+      - /app/node_modules # Preserve container's node_modules
+    environment:
+      VITE_API_URL: http://localhost:5000
+      VITE_WS_URL: ws://localhost:5000
 
 volumes:
   postgres_data:

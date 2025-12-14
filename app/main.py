@@ -3,6 +3,7 @@
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 from app.routers import rooms, messages, participants, timer, auth, websocket
 
@@ -20,6 +21,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Add CORS middleware (must be first)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://frontend:3000", "*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include Routers (no extra prefix/tags, since defined inside each router)
 app.include_router(rooms.router)

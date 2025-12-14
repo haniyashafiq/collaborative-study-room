@@ -72,32 +72,42 @@ async def websocket_endpoint(
         return
 
     # ----------------------------
-    # 5️⃣ Send previous chat messages
-    # ----------------------------
-    recent_messages = await crud.get_recent_messages(db, room_id)
-
-    for msg in reversed(recent_messages):
-        await websocket.send_json({
-            "event": "previous_message",
-            "message": {
-                "id": msg.id,
-                "content": msg.content,
-                "timestamp": msg.timestamp.isoformat(),
-                "user_id": msg.user_id,
-                "room_id": msg.room_id,
-            }
-        })
-
-    # ----------------------------
-    # 6️⃣ Connect to room
+    # 5️⃣ Connect to room first (before sending messages)
     # ----------------------------
     await manager.connect(room_id, websocket)
     print(f"User {user_id} connected to room {room_id}")
 
+    # ----------------------------
+    # 6️⃣ Send previous chat messages (with error handling)
+    # ----------------------------
+    try:
+        recent_messages = await crud.get_recent_messages(db, room_id)
+
+        for msg in reversed(recent_messages):
+            await websocket.send_json({
+                "event": "previous_message",
+                "message": {
+                    "id": msg.id,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat(),
+                    "user_id": msg.user_id,
+                    "room_id": msg.room_id,
+                }
+            })
+    except WebSocketDisconnect:
+        manager.disconnect(room_id, websocket)
+        print(f"User {user_id} disconnected during message sync")
+        return
+    except Exception as e:
+        print(f"Error sending previous messages: {e}")
+        manager.disconnect(room_id, websocket)
+        return
+
     # Callback used by TimerManager to broadcast timer updates
-    async def timer_broadcast(room_id: int, remaining: int, is_running: bool):
+    async def timer_broadcast(room_id: int, remaining: int, is_running: bool, duration: int = 1500):
         # Debug log to observe timer updates in server logs
-        print(f"[TIMER] room={room_id} remaining={remaining} running={is_running}")
+        print(f"[TIMER] room={room_id} remaining={remaining} running={is_running} duration={duration}")
+        
         # Keep track of disconnected connections
         disconnected = []
 
@@ -111,6 +121,7 @@ async def websocket_endpoint(
                         "event": "timer_update",
                         "timer": {
                             "room_id": room_id,
+                            "duration": duration,
                             "remaining": remaining,
                             "is_running": is_running,
                         },
@@ -150,11 +161,24 @@ async def websocket_endpoint(
                     # PAUSE
                     if event == "pause_timer":
                         await timer_manager.pause(room_id)
+                        # Broadcast the paused state so clients can update UI
+                        timer_state = await timer_manager.get_state(room_id)
+                        if timer_state:
+                            await timer_broadcast(room_id, timer_state["remaining"], False, timer_state["duration"])
                         continue
 
                     # RESUME
                     if event == "resume_timer":
                         await timer_manager.resume(room_id, timer_broadcast)
+                        continue
+
+                    # STOP
+                    if event == "stop_timer":
+                        timer_state = await timer_manager.get_state(room_id)
+                        duration = timer_state["duration"] if timer_state else 1500
+                        await timer_manager.stop(room_id)
+                        # Broadcast the stopped state
+                        await timer_broadcast(room_id, 0, False, duration)
                         continue
 
                     # RESET

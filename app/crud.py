@@ -165,7 +165,7 @@ async def get_participant_by_username_and_room(db: AsyncSession, username: str, 
         .where(models.User.username == username)
         .options(selectinload(models.Participant.user))  # ensures participant.user is loaded
     )
-    participant = result.scalar_one_or_none()
+    participant = result.scalars().first()
     if not participant:
         return None
 
@@ -197,7 +197,7 @@ async def create_participant(db: AsyncSession, room_id: int, user_id: int):
             models.Participant.user_id == user_id
         )
     )
-    existing = result.scalar_one_or_none()
+    existing = result.scalars().first()
     if existing:
         raise HTTPException(status_code=400, detail="User already in room")
 
@@ -207,7 +207,18 @@ async def create_participant(db: AsyncSession, room_id: int, user_id: int):
 
     # 🔹 NEW: ensure user relationship is loaded for proper serialization
     await db.refresh(participant, attribute_names=["user"])
-    return participant
+    
+    # Return ParticipantResponse with nested UserResponse
+    return schemas.ParticipantResponse(
+        id=participant.id,
+        room_id=participant.room_id,
+        user=schemas.UserResponse(
+            id=participant.user.id,
+            username=participant.user.username,
+            email=participant.user.email,
+            created_at=participant.user.created_at
+        )
+    )
 
 
 async def get_participants_by_room(db: AsyncSession, room_id: int):
